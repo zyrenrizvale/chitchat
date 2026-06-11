@@ -75,16 +75,21 @@ fun UserListItem(user: UserProfile, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (user.profilePicture.isNotEmpty()) {
-            try {
+            val bitmap = try {
                 val bytes = Base64.decode(user.profilePicture, Base64.DEFAULT)
-                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (e: Exception) {
+                null
+            }
+            
+            if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier.size(48.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
-            } catch (e: Exception) {
+            } else {
                 Box(modifier = Modifier.size(48.dp).clip(CircleShape))
             }
         } else {
