@@ -18,6 +18,10 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <service
+            android:name=".service.MessageListenerService"
+            android:exported="false" />
+
+        <service
             android:name=".service.MyFirebaseMessagingService"
             android:exported="true">
             <intent-filter>

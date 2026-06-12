@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.google.firebase.auth.FirebaseAuth
 import com.rproject.chitchat.ui.screens.chat.ChatScreen
 import com.rproject.chitchat.ui.screens.home.HomeScreen
 import com.rproject.chitchat.ui.screens.login.LoginScreen
@@ -13,6 +14,7 @@ import com.rproject.chitchat.ui.screens.otp.OtpScreen
 import com.rproject.chitchat.ui.screens.profile.ProfileSetupScreen
 import com.rproject.chitchat.ui.screens.splash.SplashScreen
 import com.rproject.chitchat.ui.screens.welcome.WelcomeScreen
+import com.rproject.chitchat.ui.screens.group.CreateGroupScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -26,6 +28,7 @@ sealed class Screen(val route: String) {
     object Chat : Screen("chat/{userId}") {
         fun createRoute(userId: String) = "chat/$userId"
     }
+    object CreateGroup : Screen("create_group")
 }
 
 @Composable
@@ -95,6 +98,9 @@ fun ChitchatNavGraph(navController: NavHostController, startDestination: String 
             HomeScreen(
                 onNavigateToChat = { userId ->
                     navController.navigate(Screen.Chat.createRoute(userId))
+                },
+                onNavigateToCreateGroup = {
+                    navController.navigate(Screen.CreateGroup.route)
                 }
             )
         }
@@ -103,6 +109,16 @@ fun ChitchatNavGraph(navController: NavHostController, startDestination: String 
             ChatScreen(
                 otherUserId = userId,
                 onBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = Screen.CreateGroup.route) {
+            CreateGroupScreen(
+                onBack = { navController.popBackStack() },
+                onGroupCreated = { groupId ->
+                    navController.navigate(Screen.Chat.createRoute(groupId)) {
+                        popUpTo(Screen.CreateGroup.route) { inclusive = true }
+                    }
+                }
             )
         }
     }
