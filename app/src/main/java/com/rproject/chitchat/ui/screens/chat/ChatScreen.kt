@@ -1,5 +1,6 @@
 package com.rproject.chitchat.ui.screens.chat
 
+import android.app.Application
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.animation.core.Spring
@@ -31,12 +32,17 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.rproject.chitchat.ui.theme.*
+import com.zegocloud.uikit.prebuilt.call.ZegoUIKitPrebuiltCallService
+import com.zegocloud.uikit.prebuilt.call.invite.ZegoUIKitPrebuiltCallInvitationConfig
+import com.zegocloud.uikit.prebuilt.call.invite.widget.ZegoSendCallInvitationButton
 
 data class ChatMessage(
     val id: String = "",
@@ -52,11 +58,32 @@ fun ChatScreen(otherUserId: String, onBack: () -> Unit) {
     var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
     var otherUserName by remember { mutableStateOf("User") }
     var otherUserImage by remember { mutableStateOf("") }
-
+    val context = LocalContext.current
+    
     val myUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
     val db = FirebaseDatabase.getInstance()
     val chatId = if (myUid < otherUserId) "${myUid}_$otherUserId" else "${otherUserId}_$myUid"
     val listState = rememberLazyListState()
+
+    // Initialize ZegoCloud once
+    LaunchedEffect(Unit) {
+        val appID: Long = 123456789L // TBD: REPLACE WITH REAL ZEGOCLOUD APP ID
+        val appSign = "your_zego_app_sign_here" // TBD: REPLACE WITH REAL SIGN
+        
+        db.getReference("users").child(myUid).get().addOnSuccessListener { s ->
+            val myName = s.child("name").getValue(String::class.java) ?: "User"
+            try {
+                ZegoUIKitPrebuiltCallService.init(
+                    context.applicationContext as Application,
+                    appID,
+                    appSign,
+                    myUid,
+                    myName,
+                    ZegoUIKitPrebuiltCallInvitationConfig()
+                )
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
 
     // Fetch Other User Info
     LaunchedEffect(otherUserId) {
@@ -94,6 +121,7 @@ fun ChatScreen(otherUserId: String, onBack: () -> Unit) {
             ChatTopBar(
                 name = otherUserName,
                 profilePicture = otherUserImage,
+                otherUserId = otherUserId,
                 onBack = onBack
             )
         },
@@ -154,7 +182,7 @@ fun AnimatedChatBubble(msg: ChatMessage, isMe: Boolean) {
 }
 
 @Composable
-fun ChatTopBar(name: String, profilePicture: String, onBack: () -> Unit) {
+fun ChatTopBar(name: String, profilePicture: String, otherUserId: String, onBack: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -205,8 +233,29 @@ fun ChatTopBar(name: String, profilePicture: String, onBack: () -> Unit) {
         
         Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary, modifier = Modifier.weight(1f))
         
-        IconButton(onClick = { }) { Icon(Icons.Outlined.Videocam, null, tint = TextPrimary) }
-        IconButton(onClick = { }) { Icon(Icons.Outlined.Call, null, tint = TextPrimary) }
+        // ZegoCloud Video Call Button
+        AndroidView(
+            modifier = Modifier.size(36.dp),
+            factory = { ctx ->
+                ZegoSendCallInvitationButton(ctx).apply {
+                    setIsVideoCall(true)
+                    setInvitees(listOf(com.zegocloud.uikit.service.defines.ZegoUIKitUser(otherUserId, name)))
+                }
+            }
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        // ZegoCloud Voice Call Button
+        AndroidView(
+            modifier = Modifier.size(36.dp),
+            factory = { ctx ->
+                ZegoSendCallInvitationButton(ctx).apply {
+                    setIsVideoCall(false)
+                    setInvitees(listOf(com.zegocloud.uikit.service.defines.ZegoUIKitUser(otherUserId, name)))
+                }
+            }
+        )
     }
 }
 
