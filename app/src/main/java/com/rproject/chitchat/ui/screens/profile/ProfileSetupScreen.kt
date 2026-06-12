@@ -16,26 +16,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.rproject.chitchat.ui.components.AuthLayout
 import com.rproject.chitchat.ui.theme.*
 import java.io.ByteArrayOutputStream
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileSetupScreen(onSetupComplete: () -> Unit) {
     val context = LocalContext.current
@@ -47,38 +46,9 @@ fun ProfileSetupScreen(onSetupComplete: () -> Unit) {
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? -> imageUri = uri }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ChitchatBgDark)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(modifier = Modifier.height(72.dp))
-
-            Text(
-                "Setup Profil",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = ChitchatOnSurface
-                )
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Buat profil kamu agar teman\nbisa mengenali kamu",
-                style = MaterialTheme.typography.bodyMedium,
-                color = ChitchatOnSurfaceVariant,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-
-            Spacer(modifier = Modifier.height(36.dp))
-
-            // Avatar picker
+    AuthLayout(
+        headerContent = {
+            // Avatar picker in header
             Box(
                 modifier = Modifier.size(100.dp),
                 contentAlignment = Alignment.BottomEnd
@@ -87,8 +57,8 @@ fun ProfileSetupScreen(onSetupComplete: () -> Unit) {
                     modifier = Modifier
                         .size(100.dp)
                         .clip(CircleShape)
-                        .background(ChitchatSurface2Dark)
-                        .border(2.dp, ChitchatPurple, CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .border(3.dp, Color.White, CircleShape)
                         .clickable { launcher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
@@ -103,7 +73,7 @@ fun ProfileSetupScreen(onSetupComplete: () -> Unit) {
                         Icon(
                             imageVector = Icons.Filled.Person,
                             contentDescription = null,
-                            tint = ChitchatOnSurfaceVariant,
+                            tint = Color.White,
                             modifier = Modifier.size(48.dp)
                         )
                     }
@@ -111,120 +81,106 @@ fun ProfileSetupScreen(onSetupComplete: () -> Unit) {
                 // Camera badge
                 Box(
                     modifier = Modifier
-                        .size(30.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
-                        .background(ChitchatPurple)
-                        .border(2.dp, ChitchatBgDark, CircleShape),
+                        .background(Color.White)
+                        .border(1.dp, BrandBlue, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.CameraAlt,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(15.dp)
+                        tint = BrandBlue,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
+        },
+        bodyContent = {
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                "Complete Profile",
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Form card
-            Column(
+            // Name input
+            TextField(
+                value = name,
+                onValueChange = { name = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(ChitchatSurfaceDark)
-                    .border(1.dp, ChitchatOutline, RoundedCornerShape(20.dp))
-                    .padding(24.dp)
-            ) {
-                Text(
-                    "Nama Lengkap",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ChitchatOnSurfaceVariant,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+                    .height(56.dp)
+                    .border(1.dp, BorderColor, RoundedCornerShape(28.dp)),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = InputBg,
+                    unfocusedContainerColor = InputBg,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                ),
+                shape = RoundedCornerShape(28.dp),
+                placeholder = {
+                    Text("Full Name", color = TextHint)
+                },
+                singleLine = true
+            )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ChitchatSurface2Dark)
-                        .border(
-                            1.5.dp,
-                            if (name.isNotEmpty()) ChitchatPurple else ChitchatOutline,
-                            RoundedCornerShape(12.dp)
-                        )
-                ) {
-                    TextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = ChitchatOnSurface,
-                            unfocusedTextColor = ChitchatOnSurface,
-                            cursorColor = ChitchatPurple
-                        ),
-                        placeholder = {
-                            Text("Masukkan nama kamu", color = ChitchatOnSurfaceVariant.copy(alpha = 0.45f))
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = ChitchatOnSurfaceVariant)
-                        },
-                        singleLine = true
-                    )
-                }
+            Spacer(modifier = Modifier.weight(1f))
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Button(
-                    onClick = {
-                        if (name.isNotBlank()) {
-                            isLoading = true
-                            val uid = FirebaseAuth.getInstance().currentUser?.uid
-                            if (uid != null) {
-                                var base64Image = ""
-                                if (imageUri != null) {
-                                    try {
-                                        val inputStream = context.contentResolver.openInputStream(imageUri!!)
-                                        val bitmap = BitmapFactory.decodeStream(inputStream)
-                                        val resized = Bitmap.createScaledBitmap(bitmap, 256, 256, true)
-                                        val baos = ByteArrayOutputStream()
-                                        resized.compress(Bitmap.CompressFormat.JPEG, 60, baos)
-                                        base64Image = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
-                                    } catch (e: Exception) { e.printStackTrace() }
-                                }
-                                val userMap = mapOf(
-                                    "name" to name,
-                                    "profilePicture" to base64Image,
-                                    "phoneNumber" to (FirebaseAuth.getInstance().currentUser?.phoneNumber ?: "")
-                                )
-                                FirebaseDatabase.getInstance().getReference("users").child(uid)
-                                    .setValue(userMap)
-                                    .addOnCompleteListener { task ->
-                                        isLoading = false
-                                        if (task.isSuccessful) onSetupComplete()
-                                        else Toast.makeText(context, "Gagal menyimpan profil", Toast.LENGTH_SHORT).show()
-                                    }
+            OutlinedButton(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        isLoading = true
+                        val uid = FirebaseAuth.getInstance().currentUser?.uid
+                        if (uid != null) {
+                            var base64Image = ""
+                            if (imageUri != null) {
+                                try {
+                                    val inputStream = context.contentResolver.openInputStream(imageUri!!)
+                                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                                    val resized = Bitmap.createScaledBitmap(bitmap, 256, 256, true)
+                                    val baos = ByteArrayOutputStream()
+                                    resized.compress(Bitmap.CompressFormat.JPEG, 60, baos)
+                                    base64Image = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                                } catch (e: Exception) { e.printStackTrace() }
                             }
+                            val userMap = mapOf(
+                                "name" to name,
+                                "profilePicture" to base64Image,
+                                "phoneNumber" to (FirebaseAuth.getInstance().currentUser?.phoneNumber ?: "")
+                            )
+                            FirebaseDatabase.getInstance().getReference("users").child(uid)
+                                .setValue(userMap)
+                                .addOnCompleteListener { task ->
+                                    isLoading = false
+                                    if (task.isSuccessful) onSetupComplete()
+                                    else Toast.makeText(context, "Gagal menyimpan profil", Toast.LENGTH_SHORT).show()
+                                }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ChitchatPurple),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = name.isNotBlank() && !isLoading
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                    } else {
-                        Text("Simpan & Lanjutkan", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                border = BorderStroke(1.5.dp, BrandBlue),
+                enabled = name.isNotBlank() && !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandBlue, strokeWidth = 2.dp)
+                } else {
+                    Text("Finish Setup", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = BrandBlue)
                 }
             }
+
+            Spacer(modifier = Modifier.height(48.dp))
         }
-    }
+    )
 }

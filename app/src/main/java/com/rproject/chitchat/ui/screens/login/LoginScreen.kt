@@ -7,11 +7,11 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forum
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.FirebaseException
@@ -30,6 +29,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
+import com.rproject.chitchat.ui.components.AuthLayout
 import com.rproject.chitchat.ui.theme.*
 import java.util.concurrent.TimeUnit
 
@@ -39,196 +39,121 @@ fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(onNavigateToOtp: (String) -> Unit) {
     val context = LocalContext.current
     var phoneNumber by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ChitchatBgDark)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(modifier = Modifier.height(80.dp))
-
-            // App icon
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.linearGradient(listOf(ChitchatPurple, ChitchatPurpleDark))
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Forum,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(36.dp)
-                )
+    AuthLayout(
+        headerContent = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Forum, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("CHITCHAT", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
+        },
+        bodyContent = {
+            Spacer(modifier = Modifier.height(32.dp))
+            
             Text(
-                "Masuk ke Chitchat",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = ChitchatOnSurface
-                )
+                "Welcome back !",
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Masukkan nomor telepon kamu\nuntuk menerima kode verifikasi",
-                style = MaterialTheme.typography.bodyMedium,
-                color = ChitchatOnSurfaceVariant,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
 
-            Spacer(modifier = Modifier.height(44.dp))
-
-            // Card
-            Column(
+            // Phone input matching reference style
+            TextField(
+                value = phoneNumber,
+                onValueChange = { phoneNumber = it.filter { c -> c.isDigit() } },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(ChitchatSurfaceDark)
-                    .border(1.dp, ChitchatOutline, RoundedCornerShape(20.dp))
-                    .padding(24.dp)
-            ) {
-                Text(
-                    "Nomor Telepon",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ChitchatOnSurfaceVariant,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Input row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ChitchatSurface2Dark)
-                        .border(
-                            width = 1.5.dp,
-                            color = if (phoneNumber.isNotEmpty()) ChitchatPurple else ChitchatOutline,
-                            shape = RoundedCornerShape(12.dp)
-                        ),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Prefix
+                    .height(56.dp)
+                    .border(1.dp, BorderColor, RoundedCornerShape(28.dp)),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = InputBg,
+                    unfocusedContainerColor = InputBg,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                ),
+                shape = RoundedCornerShape(28.dp),
+                placeholder = {
+                    Text("Phone Number", color = TextHint)
+                },
+                leadingIcon = {
                     Row(
-                        modifier = Modifier.padding(start = 14.dp, end = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier.padding(start = 20.dp, end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Phone,
-                            contentDescription = null,
-                            tint = ChitchatPurpleLight,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            "+62",
-                            color = ChitchatOnSurface,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
-                        )
-                        Divider(
-                            modifier = Modifier
-                                .height(20.dp)
-                                .width(1.dp),
-                            color = ChitchatOutline
-                        )
+                        Text("+62", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Divider(modifier = Modifier.height(24.dp).width(1.dp), color = BorderColor)
                     }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                singleLine = true
+            )
 
-                    TextField(
-                        value = phoneNumber,
-                        onValueChange = { phoneNumber = it.filter { c -> c.isDigit() } },
-                        modifier = Modifier.weight(1f),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = ChitchatOnSurface,
-                            unfocusedTextColor = ChitchatOnSurface,
-                            cursorColor = ChitchatPurple
-                        ),
-                        placeholder = {
-                            Text("8xx-xxxx-xxxx", color = ChitchatOnSurfaceVariant.copy(alpha = 0.45f), fontSize = 15.sp)
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        singleLine = true
-                    )
-                }
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(20.dp))
+            // Spacer for alignment to match reference layout
+            Spacer(modifier = Modifier.weight(1f))
 
-                Button(
-                    onClick = {
-                        val full = "+62$phoneNumber"
-                        if (phoneNumber.length >= 8) {
-                            isLoading = true
-                            sendVerificationCode(
-                                context = context,
-                                phoneNumber = full,
-                                onCodeSent = { verificationId ->
-                                    isLoading = false
-                                    onNavigateToOtp(verificationId)
-                                },
-                                onFailed = { exception ->
-                                    isLoading = false
-                                    Toast.makeText(context, "Error: ${exception.message}", Toast.LENGTH_LONG).show()
-                                }
-                            )
-                        } else {
-                            Toast.makeText(context, "Nomor tidak valid", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ChitchatPurple),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = !isLoading
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
+            // Outline Login Button
+            OutlinedButton(
+                onClick = {
+                    val full = "+62$phoneNumber"
+                    if (phoneNumber.length >= 8) {
+                        isLoading = true
+                        sendVerificationCode(
+                            context = context,
+                            phoneNumber = full,
+                            onCodeSent = { verificationId ->
+                                isLoading = false
+                                onNavigateToOtp(verificationId)
+                            },
+                            onFailed = { exception ->
+                                isLoading = false
+                                Toast.makeText(context, "Error: ${exception.message}", Toast.LENGTH_LONG).show()
+                            }
                         )
                     } else {
-                        Text(
-                            "Kirim Kode OTP",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Toast.makeText(context, "Nomor tidak valid", Toast.LENGTH_SHORT).show()
                     }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                border = BorderStroke(1.5.dp, BrandBlue),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandBlue, strokeWidth = 2.dp)
+                } else {
+                    Text("Login", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = BrandBlue)
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                "Dengan melanjutkan, kamu menyetujui\nSyarat & Ketentuan Chitchat.",
-                style = MaterialTheme.typography.bodySmall,
-                color = ChitchatOnSurfaceVariant.copy(alpha = 0.45f),
-                textAlign = TextAlign.Center,
-                lineHeight = 18.sp
-            )
+            Spacer(modifier = Modifier.height(48.dp))
         }
-    }
+    )
 }
 
 fun sendVerificationCode(

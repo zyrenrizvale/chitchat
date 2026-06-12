@@ -4,17 +4,17 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.PhoneAuthProvider
 import com.google.firebase.database.FirebaseDatabase
+import com.rproject.chitchat.ui.components.AuthLayout
 import com.rproject.chitchat.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -47,194 +48,162 @@ fun OtpScreen(verificationId: String, onVerificationSuccess: (Boolean) -> Unit) 
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ChitchatBgDark)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(modifier = Modifier.height(80.dp))
-
-            // Icon
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.linearGradient(listOf(ChitchatPurple, ChitchatPurpleDark))
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Sms,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(36.dp)
-                )
+    AuthLayout(
+        headerContent = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Forum, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("CHITCHAT", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
+        },
+        bodyContent = {
+            Spacer(modifier = Modifier.height(32.dp))
+            
             Text(
-                "Verifikasi Nomor",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = ChitchatOnSurface
-                )
+                "Verify Code",
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
             )
+            
             Spacer(modifier = Modifier.height(8.dp))
+
             Text(
-                "Masukkan 6 digit kode verifikasi\nyang telah dikirim ke nomor kamu",
-                style = MaterialTheme.typography.bodyMedium,
-                color = ChitchatOnSurfaceVariant,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
+                "Enter 6-digit verification code",
+                color = TextSecondary,
+                fontSize = 15.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
             )
 
-            Spacer(modifier = Modifier.height(44.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            // Card
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(ChitchatSurfaceDark)
-                    .border(1.dp, ChitchatOutline, RoundedCornerShape(20.dp))
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // 6-box OTP input
-                BasicTextField(
-                    value = otpCode,
-                    onValueChange = { if (it.length <= 6) otpCode = it.filter { c -> c.isDigit() } },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    decorationBox = {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            repeat(6) { idx ->
-                                val char = otpCode.getOrNull(idx)
-                                val isCurrent = idx == otpCode.length
-                                val isFilled = char != null
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(0.85f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(
-                                            if (isFilled) ChitchatPurpleContainer else ChitchatSurface2Dark
-                                        )
-                                        .border(
-                                            width = if (isCurrent || isFilled) 2.dp else 1.dp,
-                                            color = when {
-                                                isFilled -> ChitchatPurple
-                                                isCurrent -> ChitchatPurpleLight
-                                                else -> ChitchatOutline
-                                            },
-                                            shape = RoundedCornerShape(10.dp)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = char?.toString() ?: "",
-                                        style = TextStyle(
-                                            fontSize = 22.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isFilled) ChitchatPurpleLight else ChitchatOnSurface,
-                                            textAlign = TextAlign.Center
-                                        )
+            // 6-box OTP input
+            BasicTextField(
+                value = otpCode,
+                onValueChange = { if (it.length <= 6) otpCode = it.filter { c -> c.isDigit() } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                decorationBox = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        repeat(6) { idx ->
+                            val char = otpCode.getOrNull(idx)
+                            val isCurrent = idx == otpCode.length
+                            val isFilled = char != null
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(0.8f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(InputBg)
+                                    .border(
+                                        width = if (isCurrent) 1.5.dp else 1.dp,
+                                        color = when {
+                                            isCurrent -> BrandBlue
+                                            isFilled -> BrandBlue.copy(alpha = 0.5f)
+                                            else -> BorderColor
+                                        },
+                                        shape = RoundedCornerShape(12.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = char?.toString() ?: "",
+                                    style = TextStyle(
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary,
+                                        textAlign = TextAlign.Center
                                     )
-                                }
+                                )
                             }
                         }
                     }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Timer / Resend
+            if (timerRunning) {
+                Text(
+                    "Resend in ${timer}s",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Timer / Resend
-                if (timerRunning) {
-                    Text(
-                        "Kirim ulang dalam ${timer} detik",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ChitchatOnSurfaceVariant
-                    )
-                } else {
-                    TextButton(onClick = {
+            } else {
+                TextButton(
+                    onClick = {
                         otpCode = ""
                         timer = 60
                         timerRunning = true
-                        Toast.makeText(context, "Kode baru telah dikirim", Toast.LENGTH_SHORT).show()
-                    }) {
-                        Text(
-                            "Kirim Ulang Kode",
-                            color = ChitchatPurpleLight,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Button(
-                    onClick = {
-                        if (otpCode.length == 6) {
-                            isLoading = true
-                            val credential = PhoneAuthProvider.getCredential(verificationId, otpCode)
-                            FirebaseAuth.getInstance().signInWithCredential(credential)
-                                .addOnCompleteListener { task ->
-                                    if (task.isSuccessful) {
-                                        val user = task.result?.user
-                                        if (user != null) {
-                                            FirebaseDatabase.getInstance()
-                                                .getReference("users").child(user.uid)
-                                                .get()
-                                                .addOnSuccessListener { snapshot ->
-                                                    isLoading = false
-                                                    val hasProfile = snapshot.child("name").exists()
-                                                    onVerificationSuccess(!hasProfile)
-                                                }
-                                                .addOnFailureListener {
-                                                    isLoading = false
-                                                    onVerificationSuccess(true)
-                                                }
-                                        } else { isLoading = false }
-                                    } else {
-                                        isLoading = false
-                                        Toast.makeText(context, "Kode OTP salah atau kadaluarsa", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                        }
+                        Toast.makeText(context, "New code sent", Toast.LENGTH_SHORT).show()
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ChitchatPurple),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = otpCode.length == 6 && !isLoading
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text(
-                            "Verifikasi",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Text("Resend Code", color = BrandBlue, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                 }
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            OutlinedButton(
+                onClick = {
+                    if (otpCode.length == 6) {
+                        isLoading = true
+                        val credential = PhoneAuthProvider.getCredential(verificationId, otpCode)
+                        FirebaseAuth.getInstance().signInWithCredential(credential)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    val user = task.result?.user
+                                    if (user != null) {
+                                        FirebaseDatabase.getInstance()
+                                            .getReference("users").child(user.uid)
+                                            .get()
+                                            .addOnSuccessListener { snapshot ->
+                                                isLoading = false
+                                                val hasProfile = snapshot.child("name").exists()
+                                                onVerificationSuccess(!hasProfile)
+                                            }
+                                            .addOnFailureListener {
+                                                isLoading = false
+                                                onVerificationSuccess(true)
+                                            }
+                                    } else { isLoading = false }
+                                } else {
+                                    isLoading = false
+                                    Toast.makeText(context, "Invalid code", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                border = BorderStroke(1.5.dp, BrandBlue),
+                enabled = otpCode.length == 6 && !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandBlue, strokeWidth = 2.dp)
+                } else {
+                    Text("Verify", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = BrandBlue)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
         }
-    }
+    )
 }

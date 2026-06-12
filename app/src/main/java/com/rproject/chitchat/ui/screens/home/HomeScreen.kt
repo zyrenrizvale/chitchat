@@ -36,606 +36,372 @@ import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.rproject.chitchat.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
 
-data class UserProfile(
-    val uid: String = "",
-    val name: String = "",
-    val profilePicture: String = "",
-    val phoneNumber: String = ""
-)
-
-data class ConversationPreview(
-    val otherUser: UserProfile,
-    val lastMessage: String,
-    val lastTimestamp: Long,
-    val unreadCount: Int = 0
-)
-
-// ─── Bottom Nav Items ──────────────────────────────────────────────────────────
-enum class HomeTab(val label: String, val selectedIcon: ImageVector, val unselectedIcon: ImageVector) {
-    Chats("Chats", Icons.Filled.Chat, Icons.Outlined.Chat),
-    Contacts("Kontak", Icons.Filled.People, Icons.Outlined.PeopleOutline),
-    Profile("Profil", Icons.Filled.Person, Icons.Outlined.Person)
-}
+// ─── Data Models ──────────────────────────────────────────────────────────────
+data class UserProfile(val uid: String = "", val name: String = "", val phoneNumber: String = "", val profilePicture: String = "")
+data class Conversation(val userId: String, val name: String, val lastMessage: String, val timestamp: Long, val profilePicture: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(onNavigateToChat: (String) -> Unit) {
-    var selectedTab by remember { mutableStateOf(HomeTab.Chats) }
+    val context = LocalContext.current
+    var selectedTab by remember { mutableStateOf(0) }
     var showNewChatSheet by remember { mutableStateOf(false) }
-    val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
-    Scaffold(
-        containerColor = ChitchatBgDark,
-        bottomBar = {
-            NavigationBar(
-                containerColor = ChitchatSurfaceDark,
-                tonalElevation = 0.dp,
-                modifier = Modifier.border(
-                    width = 1.dp,
-                    color = ChitchatOutline,
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-                ).clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            ) {
-                HomeTab.values().forEach { tab ->
-                    val isSelected = selectedTab == tab
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { selectedTab = tab },
-                        icon = {
-                            Icon(
-                                if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                contentDescription = tab.label
-                            )
-                        },
-                        label = { Text(tab.label, fontSize = 11.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = ChitchatPurple,
-                            selectedTextColor = ChitchatPurple,
-                            unselectedIconColor = ChitchatOnSurfaceVariant,
-                            unselectedTextColor = ChitchatOnSurfaceVariant,
-                            indicatorColor = ChitchatPurpleContainer
-                        )
-                    )
+    // State
+    var myProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var conversations by remember { mutableStateOf<List<Conversation>>(emptyList()) }
+    var chitchatContacts by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var hasPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED)
+    }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasPermission = it }
+
+    // Fetch user profile & chats
+    LaunchedEffect(Unit) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
+        val db = FirebaseDatabase.getInstance()
+
+        // My Profile
+        db.getReference("users").child(uid).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) { myProfile = s.getValue(UserProfile::class.java)?.copy(uid = s.key ?: "") }
+            override fun onCancelled(e: DatabaseError) {}
+        })
+
+        // Conversations Mock/Dummy logic (replace with real listener later)
+        db.getReference("chats").child(uid).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                val list = mutableListOf<Conversation>()
+                for (chatSnap in s.children) {
+                    val otherUserId = chatSnap.key ?: continue
+                    val lastMsg = chatSnap.child("lastMessage").getValue(String::class.java) ?: "..."
+                    val ts = chatSnap.child("timestamp").getValue(Long::class.java) ?: 0L
+                    list.add(Conversation(otherUserId, "User", lastMsg, ts, ""))
                 }
+                conversations = list.sortedByDescending { it.timestamp }
             }
-        },
-        floatingActionButton = {
-            if (selectedTab == HomeTab.Chats) {
-                FloatingActionButton(
-                    onClick = { showNewChatSheet = true },
-                    containerColor = ChitchatPurple,
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(8.dp)
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = "New Chat")
+            override fun onCancelled(e: DatabaseError) {}
+        })
+    }
+
+    // Contact matching
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) {
+            // Simulated contact sync for now
+            val db = FirebaseDatabase.getInstance()
+            db.getReference("users").get().addOnSuccessListener { s ->
+                val list = mutableListOf<UserProfile>()
+                val myUid = FirebaseAuth.getInstance().currentUser?.uid
+                for (userSnap in s.children) {
+                    val u = userSnap.getValue(UserProfile::class.java)?.copy(uid = userSnap.key ?: "")
+                    if (u != null && u.uid != myUid) list.add(u)
                 }
-            }
-        }
-    ) { padding ->
-        AnimatedContent(
-            targetState = selectedTab,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "tab_content"
-        ) { tab ->
-            when (tab) {
-                HomeTab.Chats -> ChatsTab(
-                    modifier = Modifier.padding(padding),
-                    currentUid = currentUid,
-                    onNavigateToChat = onNavigateToChat
-                )
-                HomeTab.Contacts -> ContactsTab(
-                    modifier = Modifier.padding(padding),
-                    currentUid = currentUid,
-                    onNavigateToChat = onNavigateToChat
-                )
-                HomeTab.Profile -> ProfileTab(
-                    modifier = Modifier.padding(padding),
-                    currentUid = currentUid
-                )
+                chitchatContacts = list
             }
         }
     }
 
-    // New Chat Bottom Sheet
-    if (showNewChatSheet) {
-        NewChatSheet(
-            currentUid = currentUid,
-            onDismiss = { showNewChatSheet = false },
-            onNavigateToChat = { uid ->
-                showNewChatSheet = false
-                onNavigateToChat(uid)
+    Scaffold(
+        containerColor = AppBackground,
+        bottomBar = {
+            BottomNavBar(
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it }
+            )
+        },
+        floatingActionButton = {
+            if (selectedTab == 0) {
+                FloatingActionButton(
+                    onClick = { showNewChatSheet = true },
+                    containerColor = BrandPurple,
+                    contentColor = Color.White,
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "New Chat")
+                }
             }
+        }
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            AnimatedContent(targetState = selectedTab, label = "tabs") { tab ->
+                when (tab) {
+                    0 -> ChatsTab(conversations, onNavigateToChat)
+                    1 -> ContactsTab(hasPermission, chitchatContacts, onNavigateToChat) { launcher.launch(Manifest.permission.READ_CONTACTS) }
+                    2 -> ProfileTab(myProfile)
+                }
+            }
+        }
+
+        if (showNewChatSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showNewChatSheet = false },
+                containerColor = SurfaceWhite
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Select Contact", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    if (!hasPermission) {
+                        Text("Contact permission required", color = TextSecondary)
+                    } else if (chitchatContacts.isEmpty()) {
+                        Text("No contacts found on Chitchat", color = TextSecondary)
+                    } else {
+                        LazyColumn {
+                            items(chitchatContacts) { contact ->
+                                ContactItem(contact = contact) {
+                                    showNewChatSheet = false
+                                    onNavigateToChat(contact.uid)
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+// ─── BOTTOM NAV ───────────────────────────────────────────────────────────────
+@Composable
+fun BottomNavBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
+    NavigationBar(
+        containerColor = SurfaceWhite,
+        contentColor = BrandPurple,
+        tonalElevation = 8.dp
+    ) {
+        NavigationBarItem(
+            selected = selectedTab == 0,
+            onClick = { onTabSelected(0) },
+            icon = { Icon(if (selectedTab == 0) Icons.Filled.ChatBubble else Icons.Outlined.ChatBubbleOutline, null) },
+            label = { Text("Chats") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = BrandPurple,
+                unselectedIconColor = TextSecondary,
+                selectedTextColor = BrandPurple,
+                unselectedTextColor = TextSecondary,
+                indicatorColor = BrandPurpleLight
+            )
+        )
+        NavigationBarItem(
+            selected = selectedTab == 1,
+            onClick = { onTabSelected(1) },
+            icon = { Icon(if (selectedTab == 1) Icons.Filled.People else Icons.Outlined.PeopleOutline, null) },
+            label = { Text("Contacts") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = BrandPurple,
+                unselectedIconColor = TextSecondary,
+                selectedTextColor = BrandPurple,
+                unselectedTextColor = TextSecondary,
+                indicatorColor = BrandPurpleLight
+            )
+        )
+        NavigationBarItem(
+            selected = selectedTab == 2,
+            onClick = { onTabSelected(2) },
+            icon = { Icon(if (selectedTab == 2) Icons.Filled.Person else Icons.Outlined.PersonOutline, null) },
+            label = { Text("Profile") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = BrandPurple,
+                unselectedIconColor = TextSecondary,
+                selectedTextColor = BrandPurple,
+                unselectedTextColor = TextSecondary,
+                indicatorColor = BrandPurpleLight
+            )
         )
     }
 }
 
 // ─── CHATS TAB ────────────────────────────────────────────────────────────────
 @Composable
-fun ChatsTab(modifier: Modifier, currentUid: String, onNavigateToChat: (String) -> Unit) {
-    var conversations by remember { mutableStateOf<List<ConversationPreview>>(emptyList()) }
-    var allUsers by remember { mutableStateOf<Map<String, UserProfile>>(emptyMap()) }
-
-    // Load all users first
-    LaunchedEffect(Unit) {
-        FirebaseDatabase.getInstance().getReference("users")
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val map = mutableMapOf<String, UserProfile>()
-                    for (child in snapshot.children) {
-                        val u = child.getValue(UserProfile::class.java)?.copy(uid = child.key ?: "") ?: continue
-                        map[u.uid] = u
-                    }
-                    allUsers = map
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-    }
-
-    // Load conversations
-    LaunchedEffect(currentUid) {
-        FirebaseDatabase.getInstance().getReference("chats")
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val list = mutableListOf<ConversationPreview>()
-                    for (chatSnap in snapshot.children) {
-                        val chatId = chatSnap.key ?: continue
-                        if (!chatId.contains(currentUid)) continue
-                        val otherUid = chatId.replace(currentUid, "").replace("_", "")
-                        val otherUser = allUsers[otherUid] ?: continue
-                        val messagesSnap = chatSnap.child("messages")
-                        var lastMsg = ""
-                        var lastTs = 0L
-                        for (msgSnap in messagesSnap.children) {
-                            val ts = msgSnap.child("timestamp").getValue(Long::class.java) ?: 0L
-                            if (ts > lastTs) {
-                                lastTs = ts
-                                lastMsg = msgSnap.child("text").getValue(String::class.java) ?: ""
-                            }
-                        }
-                        list.add(ConversationPreview(otherUser, lastMsg, lastTs))
-                    }
-                    conversations = list.sortedByDescending { it.lastTimestamp }
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-    }
-
-    Column(modifier = modifier.fillMaxSize()) {
-        HomeTopBar(title = "Chitchat")
+fun ChatsTab(conversations: List<Conversation>, onNavigateToChat: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        HomeTopBar(title = "Chat List")
         if (conversations.isEmpty()) {
-            EmptyState(
-                icon = Icons.Filled.Forum,
-                title = "Belum ada percakapan",
-                subtitle = "Ketuk tombol tulis di bawah untuk memulai chat baru"
-            )
+            EmptyState(icon = Icons.Filled.Forum, title = "No conversations yet", subtitle = "Tap the + button to start a new chat")
         } else {
-            LazyColumn {
-                items(conversations) { conv ->
-                    ConversationItem(conv = conv, onClick = { onNavigateToChat(conv.otherUser.uid) })
-                    Divider(color = ChitchatOutline.copy(alpha = 0.5f), modifier = Modifier.padding(horizontal = 72.dp))
+            LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)) {
+                items(conversations) { chat ->
+                    ChatItem(chat = chat) { onNavigateToChat(chat.userId) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun ChatItem(chat: Conversation, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AvatarImage(profilePicture = chat.profilePicture, name = chat.name, size = 52)
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(chat.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text("10:00 AM", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(chat.lastMessage, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
 // ─── CONTACTS TAB ─────────────────────────────────────────────────────────────
 @Composable
-fun ContactsTab(modifier: Modifier, currentUid: String, onNavigateToChat: (String) -> Unit) {
-    val context = LocalContext.current
-    var allUsers by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var contactNumbers by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var hasPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> hasPermission = granted }
-
-    // Load contact phone numbers
-    LaunchedEffect(hasPermission) {
-        if (hasPermission) {
-            val numbers = mutableSetOf<String>()
-            val cursor = context.contentResolver.query(
-                android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),
-                null, null, null
-            )
-            cursor?.use {
-                val colIdx = it.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
-                while (it.moveToNext()) {
-                    val raw = it.getString(colIdx) ?: continue
-                    val normalized = raw.replace("[^0-9+]".toRegex(), "")
-                        .let { n -> if (n.startsWith("0")) "+62${n.substring(1)}" else n }
-                    numbers.add(normalized)
-                }
-            }
-            contactNumbers = numbers
-        }
-    }
-
-    // Load Firebase users
-    LaunchedEffect(Unit) {
-        FirebaseDatabase.getInstance().getReference("users")
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val list = mutableListOf<UserProfile>()
-                    for (child in snapshot.children) {
-                        val u = child.getValue(UserProfile::class.java)?.copy(uid = child.key ?: "") ?: continue
-                        if (u.uid != currentUid) list.add(u)
-                    }
-                    allUsers = list
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-    }
-
-    Column(modifier = modifier.fillMaxSize()) {
-        HomeTopBar(title = "Kontak")
+fun ContactsTab(hasPermission: Boolean, contacts: List<UserProfile>, onNavigateToChat: (String) -> Unit, onRequestPermission: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        HomeTopBar(title = "Contacts")
 
         if (!hasPermission) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(
-                    modifier = Modifier.padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Contacts,
-                        contentDescription = null,
-                        tint = ChitchatPurpleLight,
-                        modifier = Modifier.size(64.dp)
-                    )
+                Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Filled.Contacts, null, tint = BrandBlue, modifier = Modifier.size(64.dp))
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "Izin Kontak Diperlukan",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = ChitchatOnSurface
-                    )
+                    Text("Contacts Permission Required", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Chitchat membutuhkan akses kontak untuk menampilkan teman yang sudah terdaftar.",
-                        color = ChitchatOnSurfaceVariant,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-                    Spacer(modifier = Modifier.height(28.dp))
-                    Button(
-                        onClick = { permissionLauncher.launch(Manifest.permission.READ_CONTACTS) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ChitchatPurple),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) {
-                        Text("Izinkan Akses Kontak", fontWeight = FontWeight.SemiBold)
+                    Text("Chitchat needs access to your contacts to find friends.", textAlign = TextAlign.Center, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(onClick = onRequestPermission, colors = ButtonDefaults.buttonColors(containerColor = BrandPurple)) {
+                        Text("Allow Access")
                     }
                 }
             }
         } else {
-            // Filter users whose phone is in contacts
-            val chitchatContacts = allUsers.filter { user ->
-                contactNumbers.any { num ->
-                    val userNum = user.phoneNumber.replace("[^0-9+]".toRegex(), "")
-                        .let { n -> if (n.startsWith("0")) "+62${n.substring(1)}" else n }
-                    num == userNum || num.endsWith(userNum.takeLast(9))
-                }
-            }
-
-            if (chitchatContacts.isEmpty()) {
-                EmptyState(
-                    icon = Icons.Filled.PersonSearch,
-                    title = "Belum ada kontak di Chitchat",
-                    subtitle = "Ajak teman kamu bergabung di Chitchat!"
-                )
+            if (contacts.isEmpty()) {
+                EmptyState(icon = Icons.Filled.PersonSearch, title = "No contacts found", subtitle = "Invite your friends to Chitchat!")
             } else {
-                LazyColumn {
-                    items(chitchatContacts) { user ->
-                        UserListItem(user = user, onClick = { onNavigateToChat(user.uid) })
-                        Divider(color = ChitchatOutline.copy(alpha = 0.5f), modifier = Modifier.padding(horizontal = 72.dp))
+                LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)) {
+                    items(contacts) { contact ->
+                        ContactItem(contact = contact) { onNavigateToChat(contact.uid) }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun ContactItem(contact: UserProfile, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AvatarImage(profilePicture = contact.profilePicture, name = contact.name, size = 52)
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(contact.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(contact.phoneNumber, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         }
     }
 }
 
 // ─── PROFILE TAB ──────────────────────────────────────────────────────────────
 @Composable
-fun ProfileTab(modifier: Modifier, currentUid: String) {
-    var myProfile by remember { mutableStateOf<UserProfile?>(null) }
+fun ProfileTab(myProfile: UserProfile?) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        HomeTopBar(title = "Profile")
 
-    LaunchedEffect(currentUid) {
-        FirebaseDatabase.getInstance().getReference("users").child(currentUid)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    myProfile = snapshot.getValue(UserProfile::class.java)?.copy(uid = currentUid)
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        // Header bg
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(ChitchatPurple.copy(alpha = 0.25f), ChitchatBgDark)
-                    )
-                )
-                .padding(top = 48.dp, bottom = 24.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AvatarImage(
-                    profilePicture = myProfile?.profilePicture ?: "",
-                    name = myProfile?.name ?: "",
-                    size = 88
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    myProfile?.name ?: "",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = ChitchatOnSurface
-                )
-                Text(
-                    myProfile?.phoneNumber ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ChitchatOnSurfaceVariant
-                )
+                AvatarImage(profilePicture = myProfile?.profilePicture ?: "", name = myProfile?.name ?: "", size = 100)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(myProfile?.name ?: "", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(myProfile?.phoneNumber ?: "", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        ProfileMenuItem(icon = Icons.Outlined.Notifications, label = "Notifications")
+        ProfileMenuItem(icon = Icons.Outlined.Lock, label = "Privacy")
+        ProfileMenuItem(icon = Icons.Outlined.HelpOutline, label = "Help")
 
-        // Menu items
-        ProfileMenuItem(icon = Icons.Default.Notifications, label = "Notifikasi")
-        ProfileMenuItem(icon = Icons.Default.Lock, label = "Privasi")
-        ProfileMenuItem(icon = Icons.Default.Help, label = "Bantuan")
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Logout
+        Spacer(modifier = Modifier.height(24.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(ChitchatSurfaceDark)
+                .padding(horizontal = 24.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(SurfaceWhite)
                 .clickable { FirebaseAuth.getInstance().signOut() }
                 .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Logout, contentDescription = null, tint = ChitchatError)
-                Spacer(modifier = Modifier.width(14.dp))
-                Text("Keluar", color = ChitchatError, fontWeight = FontWeight.Medium)
+                Icon(Icons.Outlined.Logout, null, tint = ErrorColor)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Logout", color = ErrorColor, fontWeight = FontWeight.SemiBold)
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(40.dp))
     }
 }
 
 @Composable
 fun ProfileMenuItem(icon: ImageVector, label: String) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(ChitchatSurfaceDark)
             .clickable { }
-            .padding(16.dp)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = ChitchatPurpleLight)
-            Spacer(modifier = Modifier.width(14.dp))
-            Text(label, color = ChitchatOnSurface, fontWeight = FontWeight.Medium)
-            Spacer(modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = ChitchatOnSurfaceVariant)
+        Box(
+            modifier = Modifier.size(40.dp).clip(CircleShape).background(BrandPurpleLight),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = BrandPurple, modifier = Modifier.size(20.dp))
         }
-    }
-}
-
-// ─── NEW CHAT BOTTOM SHEET ────────────────────────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun NewChatSheet(currentUid: String, onDismiss: () -> Unit, onNavigateToChat: (String) -> Unit) {
-    var allUsers by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var search by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        FirebaseDatabase.getInstance().getReference("users")
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val list = mutableListOf<UserProfile>()
-                    for (child in snapshot.children) {
-                        val u = child.getValue(UserProfile::class.java)?.copy(uid = child.key ?: "") ?: continue
-                        if (u.uid != currentUid) list.add(u)
-                    }
-                    allUsers = list
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-    }
-
-    val filtered = allUsers.filter { it.name.contains(search, ignoreCase = true) || it.phoneNumber.contains(search) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = ChitchatSurfaceDark,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 32.dp)) {
-            Text(
-                "Chat Baru",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = ChitchatOnSurface,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // Search
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(ChitchatSurface2Dark)
-                    .border(1.dp, ChitchatOutline, RoundedCornerShape(14.dp))
-            ) {
-                TextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Cari nama atau nomor...", color = ChitchatOnSurfaceVariant.copy(0.5f)) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ChitchatOnSurfaceVariant) },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = ChitchatOnSurface,
-                        unfocusedTextColor = ChitchatOnSurface,
-                        cursorColor = ChitchatPurple
-                    ),
-                    singleLine = true
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (filtered.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text("Tidak ada pengguna ditemukan", color = ChitchatOnSurfaceVariant)
-                }
-            } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
-                    items(filtered) { user ->
-                        UserListItem(user = user, onClick = { onNavigateToChat(user.uid) })
-                    }
-                }
-            }
-        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = TextPrimary, modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, null, tint = TextHint)
     }
 }
 
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
 @Composable
 fun HomeTopBar(title: String) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ChitchatBgDark)
+            .background(SurfaceWhite)
             .padding(horizontal = 20.dp, vertical = 16.dp)
+            .statusBarsPadding(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold,
-                brush = Brush.horizontalGradient(listOf(ChitchatPurpleLight, ChitchatPurple))
-            )
-        )
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
+        IconButton(onClick = { /* Search */ }) {
+            Icon(Icons.Outlined.Search, null, tint = TextPrimary)
+        }
     }
 }
 
 @Composable
 fun EmptyState(icon: ImageVector, title: String, subtitle: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
             Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(ChitchatSurface2Dark),
+                modifier = Modifier.size(80.dp).clip(CircleShape).background(SurfaceGray),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = ChitchatPurpleLight,
-                    modifier = Modifier.size(36.dp)
-                )
+                Icon(icon, null, tint = BrandBlue, modifier = Modifier.size(36.dp))
             }
             Spacer(modifier = Modifier.height(20.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = ChitchatOnSurface, textAlign = TextAlign.Center)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(subtitle, color = ChitchatOnSurfaceVariant, fontSize = 14.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)
-        }
-    }
-}
-
-@Composable
-fun ConversationItem(conv: ConversationPreview, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AvatarImage(profilePicture = conv.otherUser.profilePicture, name = conv.otherUser.name, size = 52)
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                conv.otherUser.name,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = ChitchatOnSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                conv.lastMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = ChitchatOnSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        if (conv.lastTimestamp > 0L) {
-            Text(
-                formatTimestamp(conv.lastTimestamp),
-                style = MaterialTheme.typography.labelSmall,
-                color = ChitchatOnSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun UserListItem(user: UserProfile, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AvatarImage(profilePicture = user.profilePicture, name = user.name, size = 52)
-        Spacer(modifier = Modifier.width(14.dp))
-        Column {
-            Text(
-                user.name,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = ChitchatOnSurface
-            )
-            if (user.phoneNumber.isNotEmpty()) {
-                Text(user.phoneNumber, style = MaterialTheme.typography.bodySmall, color = ChitchatOnSurfaceVariant)
-            }
+            Text(subtitle, color = TextSecondary, textAlign = TextAlign.Center)
         }
     }
 }
@@ -661,50 +427,19 @@ fun AvatarImage(profilePicture: String, name: String, size: Int) {
     } else {
         val initials = name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
         if (initials.isNotEmpty()) {
-            // Initials avatar
             Box(
-                modifier = Modifier
-                    .size(size.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(listOf(ChitchatPurple, ChitchatPurpleDark))
-                    ),
+                modifier = Modifier.size(size.dp).clip(CircleShape).background(BrandBlue),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    initials,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = (size / 2.8).sp
-                )
+                Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size / 2.8).sp)
             }
         } else {
-            // Fallback: person icon
             Box(
-                modifier = Modifier
-                    .size(size.dp)
-                    .clip(CircleShape)
-                    .background(ChitchatSurface2Dark),
+                modifier = Modifier.size(size.dp).clip(CircleShape).background(SurfaceGray),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Person,
-                    contentDescription = null,
-                    tint = ChitchatOnSurfaceVariant,
-                    modifier = Modifier.size((size * 0.55f).dp)
-                )
+                Icon(Icons.Filled.Person, null, tint = TextHint, modifier = Modifier.size((size * 0.55f).dp))
             }
         }
-    }
-}
-
-fun formatTimestamp(ts: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - ts
-    return when {
-        diff < 60_000 -> "baru saja"
-        diff < 3600_000 -> "${diff / 60_000}m"
-        diff < 86_400_000 -> SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ts))
-        else -> SimpleDateFormat("dd/MM", Locale.getDefault()).format(Date(ts))
     }
 }
