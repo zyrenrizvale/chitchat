@@ -7,10 +7,13 @@ import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,8 +23,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -63,13 +67,11 @@ fun HomeScreen(onNavigateToChat: (String) -> Unit) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
         val db = FirebaseDatabase.getInstance()
 
-        // My Profile
         db.getReference("users").child(uid).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(s: DataSnapshot) { myProfile = s.getValue(UserProfile::class.java)?.copy(uid = s.key ?: "") }
             override fun onCancelled(e: DatabaseError) {}
         })
 
-        // Conversations Mock/Dummy logic (replace with real listener later)
         db.getReference("chats").child(uid).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(s: DataSnapshot) {
                 val list = mutableListOf<Conversation>()
@@ -85,10 +87,8 @@ fun HomeScreen(onNavigateToChat: (String) -> Unit) {
         })
     }
 
-    // Contact matching
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
-            // Simulated contact sync for now
             val db = FirebaseDatabase.getInstance()
             db.getReference("users").get().addOnSuccessListener { s ->
                 val list = mutableListOf<UserProfile>()
@@ -105,18 +105,21 @@ fun HomeScreen(onNavigateToChat: (String) -> Unit) {
     Scaffold(
         containerColor = AppBackground,
         bottomBar = {
-            BottomNavBar(
-                selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
-            )
+            BottomNavBar(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
         },
         floatingActionButton = {
             if (selectedTab == 0) {
+                val fabInteractionSource = remember { MutableInteractionSource() }
+                val isPressed by fabInteractionSource.collectIsPressedAsState()
+                val scale by animateFloatAsState(targetValue = if (isPressed) 0.85f else 1f, label = "fabScale")
+
                 FloatingActionButton(
                     onClick = { showNewChatSheet = true },
                     containerColor = BrandPurple,
                     contentColor = Color.White,
-                    shape = CircleShape
+                    shape = CircleShape,
+                    modifier = Modifier.scale(scale),
+                    interactionSource = fabInteractionSource
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "New Chat")
                 }
@@ -124,7 +127,13 @@ fun HomeScreen(onNavigateToChat: (String) -> Unit) {
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            AnimatedContent(targetState = selectedTab, label = "tabs") { tab ->
+            AnimatedContent(
+                targetState = selectedTab, 
+                label = "tabs",
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                }
+            ) { tab ->
                 when (tab) {
                     0 -> ChatsTab(conversations, onNavigateToChat)
                     1 -> ContactsTab(hasPermission, chitchatContacts, onNavigateToChat) { launcher.launch(Manifest.permission.READ_CONTACTS) }
@@ -136,9 +145,10 @@ fun HomeScreen(onNavigateToChat: (String) -> Unit) {
         if (showNewChatSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showNewChatSheet = false },
-                containerColor = SurfaceWhite
+                containerColor = SurfaceWhite,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(24.dp)) {
                     Text("Select Contact", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Spacer(modifier = Modifier.height(16.dp))
                     if (!hasPermission) {
@@ -147,10 +157,12 @@ fun HomeScreen(onNavigateToChat: (String) -> Unit) {
                         Text("No contacts found on Chitchat", color = TextSecondary)
                     } else {
                         LazyColumn {
-                            items(chitchatContacts) { contact ->
-                                ContactItem(contact = contact) {
-                                    showNewChatSheet = false
-                                    onNavigateToChat(contact.uid)
+                            itemsIndexed(chitchatContacts) { index, contact ->
+                                AnimatedListItem(index = index) {
+                                    ContactItem(contact = contact) {
+                                        showNewChatSheet = false
+                                        onNavigateToChat(contact.uid)
+                                    }
                                 }
                             }
                         }
@@ -168,18 +180,17 @@ fun BottomNavBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     NavigationBar(
         containerColor = SurfaceWhite,
         contentColor = BrandPurple,
-        tonalElevation = 8.dp
+        tonalElevation = 16.dp,
+        modifier = Modifier.clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
     ) {
         NavigationBarItem(
             selected = selectedTab == 0,
             onClick = { onTabSelected(0) },
             icon = { Icon(if (selectedTab == 0) Icons.Filled.ChatBubble else Icons.Outlined.ChatBubbleOutline, null) },
-            label = { Text("Chats") },
+            label = { Text("Chats", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = BrandPurple,
-                unselectedIconColor = TextSecondary,
-                selectedTextColor = BrandPurple,
-                unselectedTextColor = TextSecondary,
+                selectedIconColor = BrandPurple, unselectedIconColor = TextSecondary,
+                selectedTextColor = BrandPurple, unselectedTextColor = TextSecondary,
                 indicatorColor = BrandPurpleLight
             )
         )
@@ -187,12 +198,10 @@ fun BottomNavBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             selected = selectedTab == 1,
             onClick = { onTabSelected(1) },
             icon = { Icon(if (selectedTab == 1) Icons.Filled.People else Icons.Outlined.PeopleOutline, null) },
-            label = { Text("Contacts") },
+            label = { Text("Contacts", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = BrandPurple,
-                unselectedIconColor = TextSecondary,
-                selectedTextColor = BrandPurple,
-                unselectedTextColor = TextSecondary,
+                selectedIconColor = BrandPurple, unselectedIconColor = TextSecondary,
+                selectedTextColor = BrandPurple, unselectedTextColor = TextSecondary,
                 indicatorColor = BrandPurpleLight
             )
         )
@@ -200,12 +209,10 @@ fun BottomNavBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             selected = selectedTab == 2,
             onClick = { onTabSelected(2) },
             icon = { Icon(if (selectedTab == 2) Icons.Filled.Person else Icons.Outlined.PersonOutline, null) },
-            label = { Text("Profile") },
+            label = { Text("Profile", fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = BrandPurple,
-                unselectedIconColor = TextSecondary,
-                selectedTextColor = BrandPurple,
-                unselectedTextColor = TextSecondary,
+                selectedIconColor = BrandPurple, unselectedIconColor = TextSecondary,
+                selectedTextColor = BrandPurple, unselectedTextColor = TextSecondary,
                 indicatorColor = BrandPurpleLight
             )
         )
@@ -221,8 +228,10 @@ fun ChatsTab(conversations: List<Conversation>, onNavigateToChat: (String) -> Un
             EmptyState(icon = Icons.Filled.Forum, title = "No conversations yet", subtitle = "Tap the + button to start a new chat")
         } else {
             LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)) {
-                items(conversations) { chat ->
-                    ChatItem(chat = chat) { onNavigateToChat(chat.userId) }
+                itemsIndexed(conversations) { index, chat ->
+                    AnimatedListItem(index = index) {
+                        ChatItem(chat = chat) { onNavigateToChat(chat.userId) }
+                    }
                 }
             }
         }
@@ -231,14 +240,21 @@ fun ChatsTab(conversations: List<Conversation>, onNavigateToChat: (String) -> Un
 
 @Composable
 fun ChatItem(chat: Conversation, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.98f else 1f, label = "itemScale")
+    val bgAlpha by animateFloatAsState(targetValue = if (isPressed) 0.05f else 0f, label = "itemBg")
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .scale(scale)
+            .background(Color.Black.copy(alpha = bgAlpha))
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AvatarImage(profilePicture = chat.profilePicture, name = chat.name, size = 52)
+        AvatarImage(profilePicture = chat.profilePicture, name = chat.name, size = 56)
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -276,8 +292,10 @@ fun ContactsTab(hasPermission: Boolean, contacts: List<UserProfile>, onNavigateT
                 EmptyState(icon = Icons.Filled.PersonSearch, title = "No contacts found", subtitle = "Invite your friends to Chitchat!")
             } else {
                 LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)) {
-                    items(contacts) { contact ->
-                        ContactItem(contact = contact) { onNavigateToChat(contact.uid) }
+                    itemsIndexed(contacts) { index, contact ->
+                        AnimatedListItem(index = index) {
+                            ContactItem(contact = contact) { onNavigateToChat(contact.uid) }
+                        }
                     }
                 }
             }
@@ -287,14 +305,21 @@ fun ContactsTab(hasPermission: Boolean, contacts: List<UserProfile>, onNavigateT
 
 @Composable
 fun ContactItem(contact: UserProfile, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.98f else 1f, label = "itemScale")
+    val bgAlpha by animateFloatAsState(targetValue = if (isPressed) 0.05f else 0f, label = "itemBg")
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .scale(scale)
+            .background(Color.Black.copy(alpha = bgAlpha))
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AvatarImage(profilePicture = contact.profilePicture, name = contact.name, size = 52)
+        AvatarImage(profilePicture = contact.profilePicture, name = contact.name, size = 56)
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(contact.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
@@ -307,32 +332,52 @@ fun ContactItem(contact: UserProfile, onClick: () -> Unit) {
 // ─── PROFILE TAB ──────────────────────────────────────────────────────────────
 @Composable
 fun ProfileTab(myProfile: UserProfile?) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    
+    val slideOffset by animateFloatAsState(
+        targetValue = if (visible) 0f else 40f,
+        animationSpec = tween(600, easing = EaseOutExpo)
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(600, easing = EaseOutExpo)
+    )
+
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         HomeTopBar(title = "Profile")
 
         Box(
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp, bottom = 24.dp)
+                .offset(y = slideOffset.dp)
+                .alpha(alpha),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AvatarImage(profilePicture = myProfile?.profilePicture ?: "", name = myProfile?.name ?: "", size = 100)
+                AvatarImage(profilePicture = myProfile?.profilePicture ?: "", name = myProfile?.name ?: "", size = 110)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(myProfile?.name ?: "", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(myProfile?.phoneNumber ?: "", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text(myProfile?.phoneNumber ?: "", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        ProfileMenuItem(icon = Icons.Outlined.Notifications, label = "Notifications")
-        ProfileMenuItem(icon = Icons.Outlined.Lock, label = "Privacy")
-        ProfileMenuItem(icon = Icons.Outlined.HelpOutline, label = "Help")
+        Column(modifier = Modifier.offset(y = (slideOffset * 0.8f).dp).alpha(alpha)) {
+            ProfileMenuItem(icon = Icons.Outlined.Notifications, label = "Notifications")
+            ProfileMenuItem(icon = Icons.Outlined.Lock, label = "Privacy")
+            ProfileMenuItem(icon = Icons.Outlined.HelpOutline, label = "Help")
+        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
+                .offset(y = (slideOffset * 0.6f).dp)
+                .alpha(alpha)
                 .clip(RoundedCornerShape(16.dp))
                 .background(SurfaceWhite)
                 .clickable { FirebaseAuth.getInstance().signOut() }
@@ -341,7 +386,7 @@ fun ProfileTab(myProfile: UserProfile?) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Logout, null, tint = ErrorColor)
                 Spacer(modifier = Modifier.width(16.dp))
-                Text("Logout", color = ErrorColor, fontWeight = FontWeight.SemiBold)
+                Text("Logout", color = ErrorColor, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             }
         }
         Spacer(modifier = Modifier.height(40.dp))
@@ -350,58 +395,97 @@ fun ProfileTab(myProfile: UserProfile?) {
 
 @Composable
 fun ProfileMenuItem(icon: ImageVector, label: String) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val bgAlpha by animateFloatAsState(targetValue = if (isPressed) 0.05f else 0f)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .background(Color.Black.copy(alpha = bgAlpha))
+            .clickable(interactionSource = interactionSource, indication = null) { }
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(40.dp).clip(CircleShape).background(BrandPurpleLight),
+            modifier = Modifier.size(44.dp).clip(CircleShape).background(BrandPurpleLight),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, null, tint = BrandPurple, modifier = Modifier.size(20.dp))
+            Icon(icon, null, tint = BrandPurple, modifier = Modifier.size(22.dp))
         }
         Spacer(modifier = Modifier.width(16.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = TextPrimary, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = TextPrimary, modifier = Modifier.weight(1f))
         Icon(Icons.Default.ChevronRight, null, tint = TextHint)
     }
 }
 
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
 @Composable
+fun AnimatedListItem(index: Int, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 50L) // Staggered delay
+        visible = true
+    }
+    
+    val slideOffset by animateFloatAsState(
+        targetValue = if (visible) 0f else 30f,
+        animationSpec = tween(500, easing = EaseOutExpo), label = "itemSlide"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(400, easing = EaseOutExpo), label = "itemAlpha"
+    )
+
+    Box(modifier = Modifier.offset(y = slideOffset.dp).alpha(alpha)) {
+        content()
+    }
+}
+
+@Composable
 fun HomeTopBar(title: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(SurfaceWhite)
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(horizontal = 24.dp, vertical = 16.dp)
             .statusBarsPadding(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
-        IconButton(onClick = { /* Search */ }) {
-            Icon(Icons.Outlined.Search, null, tint = TextPrimary)
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(SurfaceGray)
+                .clickable { },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Outlined.Search, null, tint = TextPrimary, modifier = Modifier.size(24.dp))
         }
     }
 }
 
 @Composable
 fun EmptyState(icon: ImageVector, title: String, subtitle: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    val scale by animateFloatAsState(targetValue = if (visible) 1f else 0.8f, animationSpec = tween(600, easing = EaseOutBack))
+    val alpha by animateFloatAsState(targetValue = if (visible) 1f else 0f, animationSpec = tween(600))
+
+    Box(modifier = Modifier.fillMaxSize().scale(scale).alpha(alpha), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
             Box(
-                modifier = Modifier.size(80.dp).clip(CircleShape).background(SurfaceGray),
+                modifier = Modifier.size(88.dp).clip(CircleShape).background(SurfaceGray),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = BrandBlue, modifier = Modifier.size(36.dp))
+                Icon(icon, null, tint = BrandBlue, modifier = Modifier.size(40.dp))
             }
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(subtitle, color = TextSecondary, textAlign = TextAlign.Center)
+            Text(subtitle, color = TextSecondary, textAlign = TextAlign.Center, fontSize = 15.sp)
         }
     }
 }

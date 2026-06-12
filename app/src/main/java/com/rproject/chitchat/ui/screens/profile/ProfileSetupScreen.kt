@@ -7,10 +7,16 @@ import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +53,13 @@ fun ProfileSetupScreen(onSetupComplete: () -> Unit) {
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? -> imageUri = uri }
+
+    val inputInteractionSource = remember { MutableInteractionSource() }
+    val isFocused by inputInteractionSource.collectIsFocusedAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isFocused) BrandBlue else BorderColor,
+        animationSpec = tween(300), label = "borderColor"
+    )
 
     AuthLayout(
         headerContent = {
@@ -117,7 +131,7 @@ fun ProfileSetupScreen(onSetupComplete: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .border(1.dp, BorderColor, RoundedCornerShape(28.dp)),
+                    .border(1.5.dp, borderColor, RoundedCornerShape(28.dp)),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = InputBg,
                     unfocusedContainerColor = InputBg,
@@ -130,54 +144,70 @@ fun ProfileSetupScreen(onSetupComplete: () -> Unit) {
                 placeholder = {
                     Text("Full Name", color = TextHint)
                 },
-                singleLine = true
+                singleLine = true,
+                interactionSource = inputInteractionSource
             )
 
             Spacer(modifier = Modifier.weight(1f))
 
-            OutlinedButton(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        isLoading = true
-                        val uid = FirebaseAuth.getInstance().currentUser?.uid
-                        if (uid != null) {
-                            var base64Image = ""
-                            if (imageUri != null) {
-                                try {
-                                    val inputStream = context.contentResolver.openInputStream(imageUri!!)
-                                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                                    val resized = Bitmap.createScaledBitmap(bitmap, 256, 256, true)
-                                    val baos = ByteArrayOutputStream()
-                                    resized.compress(Bitmap.CompressFormat.JPEG, 60, baos)
-                                    base64Image = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
-                                } catch (e: Exception) { e.printStackTrace() }
-                            }
-                            val userMap = mapOf(
-                                "name" to name,
-                                "profilePicture" to base64Image,
-                                "phoneNumber" to (FirebaseAuth.getInstance().currentUser?.phoneNumber ?: "")
-                            )
-                            FirebaseDatabase.getInstance().getReference("users").child(uid)
-                                .setValue(userMap)
-                                .addOnCompleteListener { task ->
-                                    isLoading = false
-                                    if (task.isSuccessful) onSetupComplete()
-                                    else Toast.makeText(context, "Gagal menyimpan profil", Toast.LENGTH_SHORT).show()
-                                }
-                        }
-                    }
-                },
+            val buttonInteractionSource = remember { MutableInteractionSource() }
+            val isPressed by buttonInteractionSource.collectIsPressedAsState()
+            val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "bounce")
+
+            Box(
                 modifier = Modifier
+                    .scale(scale)
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                border = BorderStroke(1.5.dp, BrandBlue),
-                enabled = name.isNotBlank() && !isLoading
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .border(1.5.dp, BrandBlue, RoundedCornerShape(28.dp))
+                    .clickable(
+                        interactionSource = buttonInteractionSource,
+                        indication = null,
+                        enabled = name.isNotBlank() && !isLoading,
+                        onClick = {
+                            if (name.isNotBlank()) {
+                                isLoading = true
+                                val uid = FirebaseAuth.getInstance().currentUser?.uid
+                                if (uid != null) {
+                                    var base64Image = ""
+                                    if (imageUri != null) {
+                                        try {
+                                            val inputStream = context.contentResolver.openInputStream(imageUri!!)
+                                            val bitmap = BitmapFactory.decodeStream(inputStream)
+                                            val resized = Bitmap.createScaledBitmap(bitmap, 256, 256, true)
+                                            val baos = ByteArrayOutputStream()
+                                            resized.compress(Bitmap.CompressFormat.JPEG, 60, baos)
+                                            base64Image = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                                        } catch (e: Exception) { e.printStackTrace() }
+                                    }
+                                    val userMap = mapOf(
+                                        "name" to name,
+                                        "profilePicture" to base64Image,
+                                        "phoneNumber" to (FirebaseAuth.getInstance().currentUser?.phoneNumber ?: "")
+                                    )
+                                    FirebaseDatabase.getInstance().getReference("users").child(uid)
+                                        .setValue(userMap)
+                                        .addOnCompleteListener { task ->
+                                            isLoading = false
+                                            if (task.isSuccessful) onSetupComplete()
+                                            else Toast.makeText(context, "Gagal menyimpan profil", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
+                            }
+                        }
+                    ),
+                contentAlignment = Alignment.Center
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandBlue, strokeWidth = 2.dp)
                 } else {
-                    Text("Finish Setup", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = BrandBlue)
+                    Text(
+                        "Finish Setup",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (name.isNotBlank()) BrandBlue else BrandBlue.copy(alpha = 0.5f)
+                    )
                 }
             }
 

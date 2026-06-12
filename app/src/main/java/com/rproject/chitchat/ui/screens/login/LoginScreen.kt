@@ -4,9 +4,16 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +54,13 @@ fun LoginScreen(onNavigateToOtp: (String) -> Unit) {
     val context = LocalContext.current
     var phoneNumber by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+
+    val inputInteractionSource = remember { MutableInteractionSource() }
+    val isFocused by inputInteractionSource.collectIsFocusedAsState()
+    val borderColor by animateColorAsState(
+        targetValue = if (isFocused) BrandBlue else BorderColor,
+        animationSpec = tween(300), label = "borderColor"
+    )
 
     AuthLayout(
         headerContent = {
@@ -77,14 +92,14 @@ fun LoginScreen(onNavigateToOtp: (String) -> Unit) {
             
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Phone input matching reference style
+            // Phone input with smooth border animation
             TextField(
                 value = phoneNumber,
                 onValueChange = { phoneNumber = it.filter { c -> c.isDigit() } },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .border(1.dp, BorderColor, RoundedCornerShape(28.dp)),
+                    .border(1.5.dp, borderColor, RoundedCornerShape(28.dp)),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = InputBg,
                     unfocusedContainerColor = InputBg,
@@ -108,42 +123,52 @@ fun LoginScreen(onNavigateToOtp: (String) -> Unit) {
                     }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                singleLine = true
+                singleLine = true,
+                interactionSource = inputInteractionSource
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Spacer for alignment to match reference layout
             Spacer(modifier = Modifier.weight(1f))
 
-            // Outline Login Button
-            OutlinedButton(
-                onClick = {
-                    val full = "+62$phoneNumber"
-                    if (phoneNumber.length >= 8) {
-                        isLoading = true
-                        sendVerificationCode(
-                            context = context,
-                            phoneNumber = full,
-                            onCodeSent = { verificationId ->
-                                isLoading = false
-                                onNavigateToOtp(verificationId)
-                            },
-                            onFailed = { exception ->
-                                isLoading = false
-                                Toast.makeText(context, "Error: ${exception.message}", Toast.LENGTH_LONG).show()
-                            }
-                        )
-                    } else {
-                        Toast.makeText(context, "Nomor tidak valid", Toast.LENGTH_SHORT).show()
-                    }
-                },
+            // Animated Login Button
+            val buttonInteractionSource = remember { MutableInteractionSource() }
+            val isPressed by buttonInteractionSource.collectIsPressedAsState()
+            val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "bounce")
+
+            Box(
                 modifier = Modifier
+                    .scale(scale)
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                border = BorderStroke(1.5.dp, BrandBlue),
-                enabled = !isLoading
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .border(1.5.dp, BrandBlue, RoundedCornerShape(28.dp))
+                    .clickable(
+                        interactionSource = buttonInteractionSource,
+                        indication = null,
+                        enabled = !isLoading,
+                        onClick = {
+                            val full = "+62$phoneNumber"
+                            if (phoneNumber.length >= 8) {
+                                isLoading = true
+                                sendVerificationCode(
+                                    context = context,
+                                    phoneNumber = full,
+                                    onCodeSent = { verificationId ->
+                                        isLoading = false
+                                        onNavigateToOtp(verificationId)
+                                    },
+                                    onFailed = { exception ->
+                                        isLoading = false
+                                        Toast.makeText(context, "Error: ${exception.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            } else {
+                                Toast.makeText(context, "Nomor tidak valid", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ),
+                contentAlignment = Alignment.Center
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandBlue, strokeWidth = 2.dp)

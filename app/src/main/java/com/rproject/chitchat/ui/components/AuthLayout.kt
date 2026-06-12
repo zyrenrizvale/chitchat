@@ -1,33 +1,58 @@
 package com.rproject.chitchat.ui.components
 
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.foundation.Canvas
 import androidx.compose.ui.unit.dp
 import com.rproject.chitchat.ui.theme.AuthGradientEnd
 import com.rproject.chitchat.ui.theme.AuthGradientMid
 import com.rproject.chitchat.ui.theme.AuthGradientStart
+import kotlin.math.sin
 
 /**
- * Shared auth screen layout:
+ * Shared animated auth screen layout:
  * - Top: vibrant gradient with logo/brand
- * - Smooth wave divider
- * - Bottom: white content card area
+ * - Smooth dynamic wave divider
+ * - Bottom: white content card area with slide up animation
  */
 @Composable
 fun AuthLayout(
     headerContent: @Composable BoxScope.() -> Unit,
     bodyContent: @Composable ColumnScope.() -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    // Wave Animation State
+    val infiniteTransition = rememberInfiniteTransition(label = "wave")
+    val waveOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(12000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ), label = "waveOffset"
+    )
 
+    // Fade/Slide In State
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    val alphaAnim by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(800, easing = EaseOutExpo)
+    )
+    val slideAnim by animateFloatAsState(
+        targetValue = if (visible) 0f else 60f,
+        animationSpec = tween(800, easing = EaseOutExpo)
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
         // Gradient background (full screen)
         Box(
             modifier = Modifier
@@ -39,12 +64,18 @@ fun AuthLayout(
                 )
         )
 
-        // White wave overlay (covers ~62% from bottom)
+        // Animated Waves Overlay
         Canvas(modifier = Modifier.fillMaxSize()) {
-            drawWave(this)
+            val waveHeight = 40f
+            val baseLine = size.height * 0.38f
+            
+            // Back wave (semi-transparent)
+            drawWave(this, baseLine, waveHeight, waveOffset + 1.5f, Color.White.copy(alpha = 0.3f))
+            // Front wave
+            drawWave(this, baseLine, waveHeight, waveOffset, Color.White)
         }
 
-        // Header area — sits in gradient section
+        // Header area
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -53,32 +84,37 @@ fun AuthLayout(
             content = headerContent
         )
 
-        // Body area — sits on the white section
+        // Body area with slide up & fade in
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .fillMaxHeight(0.66f)
-                .padding(horizontal = 28.dp),
+                .padding(horizontal = 28.dp)
+                .offset(y = slideAnim.dp)
+                .background(Color.Transparent)
+                .fillMaxSize(),
             content = bodyContent
         )
     }
 }
 
-private fun drawWave(scope: DrawScope) {
+private fun drawWave(scope: DrawScope, baseLine: Float, height: Float, offset: Float, color: Color) {
     with(scope) {
-        val waveY = size.height * 0.38f
         val path = Path().apply {
-            moveTo(0f, waveY + 16f)
-            cubicTo(
-                size.width * 0.28f, waveY - 48f,
-                size.width * 0.72f, waveY + 64f,
-                size.width, waveY + 16f
-            )
+            moveTo(0f, baseLine)
+            // Draw sinusoidal wave across width
+            var x = 0f
+            while (x < size.width) {
+                val y = baseLine + sin((x / size.width * 2 * Math.PI.toFloat()) + offset) * height
+                lineTo(x, y)
+                x += 10f
+            }
+            lineTo(size.width, baseLine + sin((2 * Math.PI.toFloat()) + offset) * height)
             lineTo(size.width, size.height)
             lineTo(0f, size.height)
             close()
         }
-        drawPath(path, Color.White)
+        drawPath(path, color)
     }
 }

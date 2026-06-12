@@ -1,9 +1,12 @@
 package com.rproject.chitchat.ui.screens.otp
 
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -160,47 +164,62 @@ fun OtpScreen(verificationId: String, onVerificationSuccess: (Boolean) -> Unit) 
 
             Spacer(modifier = Modifier.weight(1f))
 
-            OutlinedButton(
-                onClick = {
-                    if (otpCode.length == 6) {
-                        isLoading = true
-                        val credential = PhoneAuthProvider.getCredential(verificationId, otpCode)
-                        FirebaseAuth.getInstance().signInWithCredential(credential)
-                            .addOnCompleteListener { task ->
-                                if (task.isSuccessful) {
-                                    val user = task.result?.user
-                                    if (user != null) {
-                                        FirebaseDatabase.getInstance()
-                                            .getReference("users").child(user.uid)
-                                            .get()
-                                            .addOnSuccessListener { snapshot ->
-                                                isLoading = false
-                                                val hasProfile = snapshot.child("name").exists()
-                                                onVerificationSuccess(!hasProfile)
-                                            }
-                                            .addOnFailureListener {
-                                                isLoading = false
-                                                onVerificationSuccess(true)
-                                            }
-                                    } else { isLoading = false }
-                                } else {
-                                    isLoading = false
-                                    Toast.makeText(context, "Invalid code", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                    }
-                },
+            val buttonInteractionSource = remember { MutableInteractionSource() }
+            val isPressed by buttonInteractionSource.collectIsPressedAsState()
+            val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "bounce")
+
+            Box(
                 modifier = Modifier
+                    .scale(scale)
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                border = BorderStroke(1.5.dp, BrandBlue),
-                enabled = otpCode.length == 6 && !isLoading
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .border(1.5.dp, BrandBlue, RoundedCornerShape(28.dp))
+                    .clickable(
+                        interactionSource = buttonInteractionSource,
+                        indication = null,
+                        enabled = otpCode.length == 6 && !isLoading,
+                        onClick = {
+                            if (otpCode.length == 6) {
+                                isLoading = true
+                                val credential = PhoneAuthProvider.getCredential(verificationId, otpCode)
+                                FirebaseAuth.getInstance().signInWithCredential(credential)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            val user = task.result?.user
+                                            if (user != null) {
+                                                FirebaseDatabase.getInstance()
+                                                    .getReference("users").child(user.uid)
+                                                    .get()
+                                                    .addOnSuccessListener { snapshot ->
+                                                        isLoading = false
+                                                        val hasProfile = snapshot.child("name").exists()
+                                                        onVerificationSuccess(!hasProfile)
+                                                    }
+                                                    .addOnFailureListener {
+                                                        isLoading = false
+                                                        onVerificationSuccess(true)
+                                                    }
+                                            } else { isLoading = false }
+                                        } else {
+                                            isLoading = false
+                                            Toast.makeText(context, "Invalid code", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                            }
+                        }
+                    ),
+                contentAlignment = Alignment.Center
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandBlue, strokeWidth = 2.dp)
                 } else {
-                    Text("Verify", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = BrandBlue)
+                    Text(
+                        "Verify",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (otpCode.length == 6) BrandBlue else BrandBlue.copy(alpha = 0.5f)
+                    )
                 }
             }
 
