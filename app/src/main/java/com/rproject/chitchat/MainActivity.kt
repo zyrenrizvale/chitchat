@@ -1,7 +1,7 @@
 package com.rproject.chitchat
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -12,7 +12,7 @@ import com.rproject.chitchat.ui.navigation.ChitchatNavGraph
 import com.rproject.chitchat.ui.navigation.Screen
 import com.rproject.chitchat.ui.theme.ChitchatTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
