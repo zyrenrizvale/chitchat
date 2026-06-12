@@ -4,13 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.rproject.chitchat.ui.screens.chat.ChatScreen
 import com.rproject.chitchat.ui.screens.home.HomeScreen
 import com.rproject.chitchat.ui.screens.login.LoginScreen
 import com.rproject.chitchat.ui.screens.otp.OtpScreen
 import com.rproject.chitchat.ui.screens.profile.ProfileSetupScreen
-import com.rproject.chitchat.ui.screens.chat.ChatScreen
+import com.rproject.chitchat.ui.screens.welcome.WelcomeScreen
 
 sealed class Screen(val route: String) {
+    object Welcome : Screen("welcome")
     object Login : Screen("login")
     object Otp : Screen("otp/{verificationId}") {
         fun createRoute(verificationId: String) = "otp/$verificationId"
@@ -23,11 +25,18 @@ sealed class Screen(val route: String) {
 }
 
 @Composable
-fun ChitchatNavGraph(navController: NavHostController, startDestination: String = Screen.Login.route) {
+fun ChitchatNavGraph(navController: NavHostController, startDestination: String = Screen.Welcome.route) {
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
+        composable(route = Screen.Welcome.route) {
+            WelcomeScreen(
+                onGetStarted = {
+                    navController.navigate(Screen.Login.route)
+                }
+            )
+        }
         composable(route = Screen.Login.route) {
             LoginScreen(
                 onNavigateToOtp = { verificationId ->
@@ -42,11 +51,11 @@ fun ChitchatNavGraph(navController: NavHostController, startDestination: String 
                 onVerificationSuccess = { isNewUser ->
                     if (isNewUser) {
                         navController.navigate(Screen.ProfileSetup.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
+                            popUpTo(Screen.Welcome.route) { inclusive = true }
                         }
                     } else {
                         navController.navigate(Screen.Home.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
+                            popUpTo(Screen.Welcome.route) { inclusive = true }
                         }
                     }
                 }
