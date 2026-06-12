@@ -16,21 +16,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Session persistence: skip Welcome/Login if already signed in
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        val startDestination = if (currentUser != null) {
-            Screen.Home.route
-        } else {
-            Screen.Welcome.route
-        }
-
         setContent {
             ChitchatTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
+                    // Start at Splash to check auth state reliably
                     ChitchatNavGraph(
                         navController = navController,
-                        startDestination = startDestination
+                        startDestination = Screen.Splash.route
                     )
                 }
             }

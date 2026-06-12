@@ -11,9 +11,11 @@ import com.rproject.chitchat.ui.screens.home.HomeScreen
 import com.rproject.chitchat.ui.screens.login.LoginScreen
 import com.rproject.chitchat.ui.screens.otp.OtpScreen
 import com.rproject.chitchat.ui.screens.profile.ProfileSetupScreen
+import com.rproject.chitchat.ui.screens.splash.SplashScreen
 import com.rproject.chitchat.ui.screens.welcome.WelcomeScreen
 
 sealed class Screen(val route: String) {
+    object Splash : Screen("splash")
     object Welcome : Screen("welcome")
     object Login : Screen("login")
     object Otp : Screen("otp/{verificationId}") {
@@ -27,7 +29,7 @@ sealed class Screen(val route: String) {
 }
 
 @Composable
-fun ChitchatNavGraph(navController: NavHostController, startDestination: String = Screen.Welcome.route) {
+fun ChitchatNavGraph(navController: NavHostController, startDestination: String = Screen.Splash.route) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -36,6 +38,19 @@ fun ChitchatNavGraph(navController: NavHostController, startDestination: String 
         popEnterTransition = { fadeIn(animationSpec = tween(400)) },
         popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, animationSpec = tween(400)) }
     ) {
+        composable(route = Screen.Splash.route) {
+            SplashScreen(
+                onNavigateToHome = {
+                    navController.navigate(Screen.Home.route) { popUpTo(Screen.Splash.route) { inclusive = true } }
+                },
+                onNavigateToWelcome = {
+                    navController.navigate(Screen.Welcome.route) { popUpTo(Screen.Splash.route) { inclusive = true } }
+                },
+                onNavigateToProfileSetup = {
+                    navController.navigate(Screen.ProfileSetup.route) { popUpTo(Screen.Splash.route) { inclusive = true } }
+                }
+            )
+        }
         composable(route = Screen.Welcome.route) {
             WelcomeScreen(
                 onGetStarted = {
