@@ -71,6 +71,7 @@ dependencies {
 
     // ZegoCloud CallKit (using their official dependency)
     implementation("com.github.ZEGOCLOUD:zego_uikit_prebuilt_call_android:+")
+    implementation("androidx.appcompat:appcompat:1.6.1")
 
     // Coil for images
     implementation("io.coil-kt:coil-compose:2.5.0")
