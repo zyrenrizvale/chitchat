@@ -70,7 +70,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // ZegoCloud CallKit (using their official dependency)
-    implementation("com.github.ZEGOCLOUD:zego_uikit_prebuilt_call_android:3.3.3")
+    implementation("com.github.ZEGOCLOUD:zego_uikit_prebuilt_call_android:+")
 
     // Coil for images
     implementation("io.coil-kt:coil-compose:2.5.0")
