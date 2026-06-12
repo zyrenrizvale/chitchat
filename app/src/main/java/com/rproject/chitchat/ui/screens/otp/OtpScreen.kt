@@ -1,13 +1,14 @@
 package com.rproject.chitchat.ui.screens.otp
 
 import android.widget.Toast
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,7 +37,6 @@ fun OtpScreen(verificationId: String, onVerificationSuccess: (Boolean) -> Unit) 
     var timerRunning by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
-    // Countdown timer
     LaunchedEffect(timerRunning) {
         if (timerRunning) {
             while (timer > 0) {
@@ -50,11 +50,7 @@ fun OtpScreen(verificationId: String, onVerificationSuccess: (Boolean) -> Unit) 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(ChitchatBgDark, ChitchatSurfaceDark, Color(0xFF1A1830))
-                )
-            )
+            .background(ChitchatBgDark)
     ) {
         Column(
             modifier = Modifier
@@ -67,16 +63,22 @@ fun OtpScreen(verificationId: String, onVerificationSuccess: (Boolean) -> Unit) 
             // Icon
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .background(
                         Brush.linearGradient(listOf(ChitchatPurple, ChitchatPurpleDark))
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text("📱", fontSize = 38.sp)
+                Icon(
+                    imageVector = Icons.Filled.Sms,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(36.dp)
+                )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
                 "Verifikasi Nomor",
@@ -87,156 +89,149 @@ fun OtpScreen(verificationId: String, onVerificationSuccess: (Boolean) -> Unit) 
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Masukkan 6 digit kode yang dikirim\nke nomor telepon kamu",
+                "Masukkan 6 digit kode verifikasi\nyang telah dikirim ke nomor kamu",
                 style = MaterialTheme.typography.bodyMedium,
                 color = ChitchatOnSurfaceVariant,
                 textAlign = TextAlign.Center,
                 lineHeight = 22.sp
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(44.dp))
 
             // Card
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(ChitchatSurfaceDark.copy(alpha = 0.85f))
-                    .border(1.dp, ChitchatOutline, RoundedCornerShape(24.dp))
-                    .padding(28.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(ChitchatSurfaceDark)
+                    .border(1.dp, ChitchatOutline, RoundedCornerShape(20.dp))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
-                    // 6-box OTP Input
-                    BasicTextField(
-                        value = otpCode,
-                        onValueChange = { if (it.length <= 6) otpCode = it.filter { c -> c.isDigit() } },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        decorationBox = {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                repeat(6) { idx ->
-                                    val char = otpCode.getOrNull(idx)
-                                    val isCurrent = idx == otpCode.length
-                                    val isFilled = char != null
-
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .aspectRatio(0.85f)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(
-                                                if (isFilled) ChitchatPurpleContainer
-                                                else ChitchatSurface2Dark
-                                            )
-                                            .border(
-                                                width = if (isCurrent || isFilled) 2.dp else 1.dp,
-                                                color = when {
-                                                    isFilled -> ChitchatPurple
-                                                    isCurrent -> ChitchatPurpleLight
-                                                    else -> ChitchatOutline
-                                                },
-                                                shape = RoundedCornerShape(12.dp)
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = char?.toString() ?: "",
-                                            style = TextStyle(
-                                                fontSize = 22.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isFilled) ChitchatPurpleLight else ChitchatOnSurface,
-                                                textAlign = TextAlign.Center
-                                            )
+                // 6-box OTP input
+                BasicTextField(
+                    value = otpCode,
+                    onValueChange = { if (it.length <= 6) otpCode = it.filter { c -> c.isDigit() } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    decorationBox = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            repeat(6) { idx ->
+                                val char = otpCode.getOrNull(idx)
+                                val isCurrent = idx == otpCode.length
+                                val isFilled = char != null
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(0.85f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            if (isFilled) ChitchatPurpleContainer else ChitchatSurface2Dark
                                         )
-                                    }
+                                        .border(
+                                            width = if (isCurrent || isFilled) 2.dp else 1.dp,
+                                            color = when {
+                                                isFilled -> ChitchatPurple
+                                                isCurrent -> ChitchatPurpleLight
+                                                else -> ChitchatOutline
+                                            },
+                                            shape = RoundedCornerShape(10.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = char?.toString() ?: "",
+                                        style = TextStyle(
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isFilled) ChitchatPurpleLight else ChitchatOnSurface,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    )
                                 }
                             }
                         }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Timer / Resend
+                if (timerRunning) {
+                    Text(
+                        "Kirim ulang dalam ${timer} detik",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ChitchatOnSurfaceVariant
                     )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Timer / Resend
-                    if (timerRunning) {
+                } else {
+                    TextButton(onClick = {
+                        otpCode = ""
+                        timer = 60
+                        timerRunning = true
+                        Toast.makeText(context, "Kode baru telah dikirim", Toast.LENGTH_SHORT).show()
+                    }) {
                         Text(
-                            "Kirim ulang dalam ${timer}s",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ChitchatOnSurfaceVariant
+                            "Kirim Ulang Kode",
+                            color = ChitchatPurpleLight,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = {
+                        if (otpCode.length == 6) {
+                            isLoading = true
+                            val credential = PhoneAuthProvider.getCredential(verificationId, otpCode)
+                            FirebaseAuth.getInstance().signInWithCredential(credential)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        val user = task.result?.user
+                                        if (user != null) {
+                                            FirebaseDatabase.getInstance()
+                                                .getReference("users").child(user.uid)
+                                                .get()
+                                                .addOnSuccessListener { snapshot ->
+                                                    isLoading = false
+                                                    val hasProfile = snapshot.child("name").exists()
+                                                    onVerificationSuccess(!hasProfile)
+                                                }
+                                                .addOnFailureListener {
+                                                    isLoading = false
+                                                    onVerificationSuccess(true)
+                                                }
+                                        } else { isLoading = false }
+                                    } else {
+                                        isLoading = false
+                                        Toast.makeText(context, "Kode OTP salah atau kadaluarsa", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ChitchatPurple),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = otpCode.length == 6 && !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
                         )
                     } else {
-                        TextButton(onClick = {
-                            otpCode = ""
-                            timer = 60
-                            timerRunning = true
-                            Toast.makeText(context, "Kode baru telah dikirim", Toast.LENGTH_SHORT).show()
-                        }) {
-                            Text(
-                                "Kirim Ulang Kode",
-                                color = ChitchatPurpleLight,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Verify button
-                    Button(
-                        onClick = {
-                            if (otpCode.length == 6) {
-                                isLoading = true
-                                val credential = PhoneAuthProvider.getCredential(verificationId, otpCode)
-                                FirebaseAuth.getInstance().signInWithCredential(credential)
-                                    .addOnCompleteListener { task ->
-                                        if (task.isSuccessful) {
-                                            val user = task.result?.user
-                                            if (user != null) {
-                                                FirebaseDatabase.getInstance()
-                                                    .getReference("users").child(user.uid)
-                                                    .get()
-                                                    .addOnSuccessListener { snapshot ->
-                                                        isLoading = false
-                                                        val hasProfile = snapshot.child("name").exists()
-                                                        onVerificationSuccess(!hasProfile)
-                                                    }
-                                                    .addOnFailureListener {
-                                                        isLoading = false
-                                                        onVerificationSuccess(true)
-                                                    }
-                                            } else {
-                                                isLoading = false
-                                            }
-                                        } else {
-                                            isLoading = false
-                                            Toast.makeText(context, "Kode OTP salah atau kadaluarsa", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ChitchatPurple),
-                        shape = RoundedCornerShape(14.dp),
-                        enabled = otpCode.length == 6 && !isLoading
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                color = Color.White,
-                                strokeWidth = 2.5.dp
-                            )
-                        } else {
-                            Text(
-                                "Verifikasi",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.3.sp
-                            )
-                        }
+                        Text(
+                            "Verifikasi",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }

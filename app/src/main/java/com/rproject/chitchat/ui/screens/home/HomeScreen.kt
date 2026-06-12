@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -207,9 +208,9 @@ fun ChatsTab(modifier: Modifier, currentUid: String, onNavigateToChat: (String) 
         HomeTopBar(title = "Chitchat")
         if (conversations.isEmpty()) {
             EmptyState(
-                emoji = "💬",
+                icon = Icons.Filled.Forum,
                 title = "Belum ada percakapan",
-                subtitle = "Tekan tombol ✏️ di bawah untuk memulai chat baru"
+                subtitle = "Ketuk tombol tulis di bawah untuk memulai chat baru"
             )
         } else {
             LazyColumn {
@@ -280,13 +281,17 @@ fun ContactsTab(modifier: Modifier, currentUid: String, onNavigateToChat: (Strin
         HomeTopBar(title = "Kontak")
 
         if (!hasPermission) {
-            // Permission request card
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
                     modifier = Modifier.padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("📱", fontSize = 56.sp)
+                    Icon(
+                        imageVector = Icons.Filled.Contacts,
+                        contentDescription = null,
+                        tint = ChitchatPurpleLight,
+                        modifier = Modifier.size(64.dp)
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         "Izin Kontak Diperlukan",
@@ -325,9 +330,9 @@ fun ContactsTab(modifier: Modifier, currentUid: String, onNavigateToChat: (Strin
 
             if (chitchatContacts.isEmpty()) {
                 EmptyState(
-                    emoji = "👥",
+                    icon = Icons.Filled.PersonSearch,
                     title = "Belum ada kontak di Chitchat",
-                    subtitle = "Ajak teman kamu bergabung!"
+                    subtitle = "Ajak teman kamu bergabung di Chitchat!"
                 )
             } else {
                 LazyColumn {
@@ -365,14 +370,15 @@ fun ProfileTab(modifier: Modifier, currentUid: String) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
                 .background(
-                    Brush.verticalGradient(listOf(ChitchatPurple.copy(alpha = 0.3f), ChitchatBgDark))
-                ),
+                    Brush.verticalGradient(
+                        listOf(ChitchatPurple.copy(alpha = 0.25f), ChitchatBgDark)
+                    )
+                )
+                .padding(top = 48.dp, bottom = 24.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(modifier = Modifier.height(40.dp))
                 AvatarImage(
                     profilePicture = myProfile?.profilePicture ?: "",
                     name = myProfile?.name ?: "",
@@ -392,7 +398,7 @@ fun ProfileTab(modifier: Modifier, currentUid: String) {
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Menu items
         ProfileMenuItem(icon = Icons.Default.Notifications, label = "Notifikasi")
@@ -543,14 +549,30 @@ fun HomeTopBar(title: String) {
 }
 
 @Composable
-fun EmptyState(emoji: String, title: String, subtitle: String) {
+fun EmptyState(icon: ImageVector, title: String, subtitle: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
-            Text(emoji, fontSize = 56.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = ChitchatOnSurface)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(ChitchatSurface2Dark),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = ChitchatPurpleLight,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = ChitchatOnSurface, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(subtitle, color = ChitchatOnSurfaceVariant, fontSize = 14.sp, lineHeight = 20.sp)
+            Text(subtitle, color = ChitchatOnSurfaceVariant, fontSize = 14.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)
         }
     }
 }
@@ -637,23 +659,41 @@ fun AvatarImage(profilePicture: String, name: String, size: Int) {
             contentScale = ContentScale.Crop
         )
     } else {
-        // Initials avatar
         val initials = name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
-        Box(
-            modifier = Modifier
-                .size(size.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(listOf(ChitchatPurple, ChitchatPurpleDark))
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                initials.ifEmpty { "?" },
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = (size / 2.8).sp
-            )
+        if (initials.isNotEmpty()) {
+            // Initials avatar
+            Box(
+                modifier = Modifier
+                    .size(size.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(listOf(ChitchatPurple, ChitchatPurpleDark))
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    initials,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (size / 2.8).sp
+                )
+            }
+        } else {
+            // Fallback: person icon
+            Box(
+                modifier = Modifier
+                    .size(size.dp)
+                    .clip(CircleShape)
+                    .background(ChitchatSurface2Dark),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = ChitchatOnSurfaceVariant,
+                    modifier = Modifier.size((size * 0.55f).dp)
+                )
+            }
         }
     }
 }
