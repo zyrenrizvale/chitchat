@@ -84,7 +84,7 @@ class MessageListenerService : Service() {
         val pendingIntent: PendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
 
         val builder = NotificationCompat.Builder(this, "chitchat_channel")
-            .setSmallIcon(R.mipmap.ic_launcher) // Fallback icon
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // Fallback icon
             .setContentTitle(title)
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
